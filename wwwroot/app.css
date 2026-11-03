@@ -13,7 +13,7 @@ a, .btn-link {
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }
 
 .content {
@@ -57,4 +57,40 @@ h1:focus {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+
+/* Tema escuro aplicado já no carregamento (antes do Blazor conectar), evita o flash */
+html[data-theme="dark"] .pagina {
+    --texto: #e5e7eb;
+    --texto-suave: #9ca3af;
+    --borda: rgba(255, 255, 255, 0.14);
+    --superficie: rgba(17, 24, 39, 0.55);
+    --superficie-forte: rgba(17, 24, 39, 0.72);
+    --fundo: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #111827 100%);
+    --sombra: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* Modo claro forçado desde o carregamento (mesmo se a página nascer com a classe .escuro) */
+html[data-theme="light"] .pagina,
+html[data-theme="light"] .pagina.escuro {
+    --texto: #1f2937;
+    --texto-suave: #6b7280;
+    --borda: rgba(255, 255, 255, 0.35);
+    --superficie: rgba(255, 255, 255, 0.55);
+    --superficie-forte: rgba(255, 255, 255, 0.72);
+    --fundo: linear-gradient(135deg, #dbeafe 0%, #ede9fe 45%, #fce7f3 100%);
+    --sombra: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+/* Texto do botão de tema: escolhido pelo tema do <html>, sem esperar o Blazor */
+.tema-txt-claro, .tema-txt-escuro {
+    display: none;
+}
+
+html[data-theme="dark"] .tema-txt-claro {
+    display: inline;
+}
+
+html[data-theme="light"] .tema-txt-escuro {
+    display: inline;
 }

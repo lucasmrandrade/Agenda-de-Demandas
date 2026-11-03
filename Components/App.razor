@@ -4,6 +4,15 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+            (function () {
+                try {
+                    // mesma regra do Home.razor: escuro, a não ser que o tema salvo seja "claro"
+                    var escuro = localStorage.getItem('tema') !== 'claro';
+                    document.documentElement.setAttribute('data-theme', escuro ? 'dark' : 'light');
+                } catch (e) { }
+            })();
+    </script>
     <base href="/" />
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
@@ -17,6 +26,7 @@
 <body>
     <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
+    <script src="js/tema.js"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 

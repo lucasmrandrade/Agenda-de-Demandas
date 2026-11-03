@@ -1,5 +1,7 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@inject IJSRuntime JS
+
 
 @using AgendamentoDemandas.Data
 @using Microsoft.EntityFrameworkCore
@@ -30,9 +32,10 @@
                        @bind:after="CarregarDemandas" />
             </div>
 
-            <button class="botao-tema"
+            <button type="button"
+                    class="botao-tema"
                     @onclick="AlternarTema">
-                @(modoEscuro ? "☀️ Claro" : "🌙 Escuro")
+                <span class="tema-txt-claro">☀️ Claro</span><span class="tema-txt-escuro">🌙 Escuro</span>
             </button>
         </div>
     </header>
@@ -131,6 +134,7 @@
     private List<Demanda> demandas = new();
 
     private bool modoEscuro = true;
+    private bool temaCarregado;
 
     private readonly Prioridade[] colunas =
     {
@@ -168,10 +172,27 @@
             _ => ""
         };
     }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
 
-    private void AlternarTema()
+        var temaSalvo = await JS.InvokeAsync<string?>("temaApp.obterTema");
+
+        modoEscuro = temaSalvo != "claro";
+        temaCarregado = true;
+
+        StateHasChanged();
+    }
+
+    private async Task AlternarTema()
     {
         modoEscuro = !modoEscuro;
+
+        await JS.InvokeVoidAsync(
+            "temaApp.salvarTema",
+            modoEscuro ? "escuro" : "claro"
+        );
     }
 
     private async Task CarregarDemandas()
