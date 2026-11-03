@@ -1,0 +1,298 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+@using AgendamentoDemandas.Data
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<AgendaDbContext> DbFactory
+
+<PageTitle>Agendamento de Demandas</PageTitle>
+
+<div class="pagina @(modoEscuro ? "escuro" : "claro")">
+
+    <header class="cabecalho">
+        <div>
+            <h1>Agendamento de Demandas</h1>
+            <p>
+                Organize, priorize e acompanhe as demandas do dia.
+                <strong>
+                    @demandas.Count(d => d.Concluida) concluída(s)
+                </strong>
+            </p>
+        </div>
+
+        <div class="acoes">
+            <div class="filtro">
+                <label for="dataFiltro">Demandas do dia</label>
+                <input id="dataFiltro"
+                       type="date"
+                       @bind="dataFiltro"
+                       @bind:after="CarregarDemandas" />
+            </div>
+
+            <button class="botao-tema"
+                    @onclick="AlternarTema">
+                @(modoEscuro ? "☀️ Claro" : "🌙 Escuro")
+            </button>
+        </div>
+    </header>
+
+    <section class="cartao formulario">
+        <h2>Nova demanda</h2>
+
+        <div class="campos">
+            <div class="campo">
+                <label for="titulo">Nome da demanda</label>
+                <input id="titulo"
+                       placeholder="Ex.: Revisar relatório mensal"
+                       @bind="titulo"
+                       @onkeydown="@(e => { if (e.Key == "Enter") AdicionarDemanda(); })" />
+            </div>
+
+            <div class="campo">
+                <label for="data">Data</label>
+                <input id="data"
+                       type="date"
+                       @bind="data" />
+            </div>
+
+            <button class="botao"
+                    disabled="@ocupado"
+                    @onclick="AdicionarDemanda">
+                Adicionar
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(aviso))
+        {
+            <p class="aviso">@aviso</p>
+        }
+    </section>
+
+    <section class="quadro">
+        @foreach (var prioridade in colunas)
+        {
+            <div class="coluna @ClassePrioridade(prioridade)"
+                 @ondragover:preventDefault="true"
+                 @ondrop="() => MoverDemanda(prioridade)">
+
+                <div class="coluna-cabecalho">
+                    <span class="indicador"></span>
+                    <h3>@NomePrioridade(prioridade)</h3>
+                    <span class="contador">
+                        @demandas.Count(d => d.prioridades == prioridade)
+                    </span>
+                </div>
+
+                <div class="lista">
+                    @foreach (var demanda in demandas
+                        .Where(d => d.prioridades == prioridade))
+                    {
+                        <article class="demanda @(demanda.Concluida ? "concluida" : "")"
+                                 @key="demanda.Id"
+                                 draggable="true"
+                                 @ondragstart="() => IniciarArrasto(demanda.Id)"
+                                 @ondragend="LimparArrasto">
+
+                            <p class="titulo">@demanda.Titulo</p>
+
+                            <div class="rodape">
+                                <span>@demanda.Data.ToString("dd/MM/yyyy")</span>
+
+                                <button class="botao-concluir"
+                                        disabled="@ocupado"
+                                        @onclick="() => AlternarConclusao(demanda)">
+                                    @(demanda.Concluida ? "Reabrir" : "Concluir")
+                                </button>
+                            </div>
+                        </article>
+                    }
+
+                    @if (!demandas.Any(d => d.prioridades == prioridade))
+                    {
+                        <p class="vazio">Arraste uma demanda para cá</p>
+                    }
+                </div>
+            </div>
+        }
+    </section>
+
+</div>
+
+@code {
+    private string titulo = "";
+    private DateTime data = DateTime.Today;
+    private DateTime dataFiltro = DateTime.Today;
+
+    private string aviso = "";
+    private bool ocupado;
+    private int? demandaArrastadaId;
+
+    private List<Demanda> demandas = new();
+
+    private bool modoEscuro = true;
+
+    private readonly Prioridade[] colunas =
+    {
+        Prioridade.Baixa,
+        Prioridade.Media,
+        Prioridade.Alta,
+        Prioridade.prioridadeAlta
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDemandas();
+    }
+
+    private static string NomePrioridade(Prioridade prioridade)
+    {
+        return prioridade switch
+        {
+            Prioridade.Baixa => "Baixa",
+            Prioridade.Media => "Média",
+            Prioridade.Alta => "Alta",
+            Prioridade.prioridadeAlta => "Prioridade Alta",
+            _ => ""
+        };
+    }
+
+    private static string ClassePrioridade(Prioridade prioridade)
+    {
+        return prioridade switch
+        {
+            Prioridade.Baixa => "baixa",
+            Prioridade.Media => "media",
+            Prioridade.Alta => "alta",
+            Prioridade.prioridadeAlta => "prioridade-alta",
+            _ => ""
+        };
+    }
+
+    private void AlternarTema()
+    {
+        modoEscuro = !modoEscuro;
+    }
+
+    private async Task CarregarDemandas()
+    {
+        var inicio = dataFiltro.Date;
+        var fim = inicio.AddDays(1);
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        demandas = await db.Demandas
+            .AsNoTracking()
+            .Where(d => d.Data >= inicio && d.Data < fim)
+            .OrderBy(d => d.Id)
+            .ToListAsync();
+    }
+
+    private async Task AdicionarDemanda()
+    {
+        if (ocupado)
+            return;
+
+        aviso = "";
+
+        if (string.IsNullOrWhiteSpace(titulo))
+        {
+            aviso = "Digite o nome da demanda.";
+            return;
+        }
+
+        ocupado = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            db.Demandas.Add(new Demanda
+            {
+                Titulo = titulo.Trim(),
+                Data = data.Date,
+                prioridades = Prioridade.Baixa,
+                Concluida = false
+            });
+
+            await db.SaveChangesAsync();
+
+            titulo = "";
+
+            await CarregarDemandas();
+        }
+        finally
+        {
+            ocupado = false;
+        }
+    }
+
+    private async Task AlternarConclusao(Demanda demanda)
+    {
+        if (ocupado)
+            return;
+
+        ocupado = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var demandaDb = await db.Demandas.FindAsync(demanda.Id);
+
+            if (demandaDb is not null)
+            {
+                demandaDb.Concluida = !demandaDb.Concluida;
+
+                await db.SaveChangesAsync();
+
+                await CarregarDemandas();
+            }
+        }
+        finally
+        {
+            ocupado = false;
+        }
+    }
+
+    private void IniciarArrasto(int id)
+    {
+        demandaArrastadaId = ocupado ? null : id;
+    }
+
+    private void LimparArrasto()
+    {
+        demandaArrastadaId = null;
+    }
+
+    private async Task MoverDemanda(Prioridade novaPrioridade)
+    {
+        var id = demandaArrastadaId;
+        demandaArrastadaId = null;
+
+        if (ocupado || id is null)
+            return;
+
+        ocupado = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var demanda = await db.Demandas.FindAsync(id.Value);
+
+            if (demanda is not null)
+            {
+                demanda.prioridades = novaPrioridade;
+
+                await db.SaveChangesAsync();
+
+                await CarregarDemandas();
+            }
+        }
+        finally
+        {
+            ocupado = false;
+        }
+    }
+}
